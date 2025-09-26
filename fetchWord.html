@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8">
+  <title>Từ điển Hanzi Demo</title>
+</head>
+<body>
+  <h2>Tra cứu từ vựng</h2>
+  <input id="searchInput" placeholder="Nhập từ cần tra">
+  <button onclick="searchWord()">Tra cứu</button>
+
+  <div id="result"></div>
+
+  <script>
+    const SHEET_ID = "1eh7jBYf_C6nxbljxpejSl9UdlQtCFGEgr5C9DHXKGr8"; // thay bằng sheet của bạn
+    const GID = "1962099559"; // thay bằng gid sheet con của bạn
+
+    async function fetchWord(word) {
+      const query = encodeURIComponent(`select A,B where A = '${word}'`);
+      const url = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tq=${query}&gid=${GID}`;
+      
+      try {
+        const response = await fetch(url);
+        const text = await response.text();
+        
+        // Parse JSON đặc biệt của Google (bỏ prefix và suffix thừa)
+        const json = JSON.parse(text.substr(47).slice(0, -2));
+        
+        if (json.table.rows.length > 0) {
+          const hanzi = json.table.rows[0].c[0]?.v || "";
+          const audioLink = json.table.rows[0].c[1]?.v || "";
+          return { hanzi, link_mp3: audioLink };
+        } else {
+          return null;
+        }
+      } catch (err) {
+        console.error("Lỗi query:", err);
+        return null;
+      }
+    }
+
+    async function searchWord() {
+      const word = document.getElementById("searchInput").value.trim();
+      if (!word) return;
+
+      const result = await fetchWord(word);
+      const container = document.getElementById("result");
+      container.innerHTML = "";
+
+      if (result) {
+        container.innerHTML = `
+          <h3>${result.hanzi}${result.link_mp3}</h3>
+          <button onclick="playAudio('${result.link_mp3}')">🔊 Nghe phát âm</button>
+        `;
+      } else {
+        container.innerHTML = `<p>Không tìm thấy từ: ${word}</p>`;
+      }
+    }
+
+    function playAudio(url) {
+      if (!url) {
+        alert("Không có link phát âm");
+        return;
+      }
+      const audio = new Audio(url);
+      audio.play();
+    }
+  </script>
+</body>
+</html>
