@@ -1,0 +1,119 @@
+<audio class="hide" id="player" controls preload="none"></audio>
+
+<script>
+    if (typeof audio === "undefined") {
+        var audio = document.getElementById('player');
+    }
+
+    async function fetchWordFromSheet(word) {
+        const SHEET_ID = "1Nkbmb8eYhBXzuY4bfWdHToxR7mbRei39n36g6YlsrYw";
+        const GID = "1105922470";
+        try {
+            const q = encodeURIComponent(`select A,B where A = '${word.replace(/'/g, "_")}'`);
+            const url = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tq=${q}&gid=${GID}`;
+            const resp = await fetch(url);
+            const text = await resp.text();
+            const json = JSON.parse(text.substr(47).slice(0, -2));
+            if (json.table.rows && json.table.rows.length > 0) {
+                const rawCell = json.table.rows[0].c[1]?.v || null;
+                if (!rawCell) return null;
+                return rawCell.split(/[,;]\s*/).map(s => s.trim()).filter(Boolean);
+            } else {
+                return null;
+            }
+        } catch {
+            return null;
+        }
+    }
+
+    function tryPlayUrl(url, timeoutMs = 8000) {
+        return new Promise((resolve, reject) => {
+            if (!url) return reject(new Error("URL rỗng"));
+
+            const cleanup = () => {
+                audio.oncanplay = null;
+                audio.onerror = null;
+                clearTimeout(timer);
+            };
+
+            let finished = false;
+            audio.src = url;
+            audio.load();
+
+            audio.oncanplay = async () => {
+                if (finished) return;
+                finished = true;
+                cleanup();
+                try {
+                    await audio.play();
+                    resolve(true);
+                } catch (errPlay) {
+                    reject(errPlay);
+                }
+            };
+
+            audio.onerror = () => {
+                if (finished) return;
+                finished = true;
+                cleanup();
+                reject(new Error("Không load được audio: " + url));
+            };
+
+            const timer = setTimeout(() => {
+                if (finished) return;
+                finished = true;
+                cleanup();
+                reject(new Error("Timeout khi load audio: " + url));
+            }, timeoutMs);
+        });
+    }
+
+    async function playWord(raw) {
+        const baseCambridge = 'https://dictionary.cambridge.org/media/english/us_pron/';
+        const baseGoogle = 'https://ssl.gstatic.com/dictionary/static/pronunciation/2024-04-19/audio/';
+        const baseOxford = 'https://www.oxfordlearnersdictionaries.com/media/english/us_pron/';
+        const word = String(raw || "").trim().toLowerCase();
+        if (!word) return;
+
+        const first = word.slice(0, 1) || "_";
+        const first2 = word.slice(0, 2).padEnd(2, "_");
+        const first3 = word.slice(0, 3).padEnd(3, "_");
+        const first5 = word.slice(0, 5).padEnd(5, "_");
+
+        const cambridgeUrl = `${baseCambridge}${first}/${first3}/${first5}/${word}.mp3`;
+        const oxfordUrl = `${baseOxford}${first}/${first3}/${first5}/${word}__us_1.mp3`;
+        const googleUrl = `${baseGoogle}${first2}/${word}_en_us_1.mp3`;
+
+        const sheetPromise = fetchWordFromSheet(word);
+
+        try {
+            await tryPlayUrl(oxfordUrl, 7000);
+            return;
+        } catch { }
+
+        let sheetLinks = null;
+        try {
+            sheetLinks = await sheetPromise;
+        } catch { }
+
+        if (Array.isArray(sheetLinks) && sheetLinks.length > 0) {
+            for (const url of sheetLinks) {
+                try {
+                    await tryPlayUrl(url, 7000);
+                    return;
+                } catch { }
+            }
+        }
+
+        // const fallbackList = [myWordUrl, googleUrl];
+        const fallbackList = [googleUrl];
+        for (const u of fallbackList) {
+            try {
+                await tryPlayUrl(u, 7000);
+                return;
+            } catch { }
+        }
+
+        alert("Không thể phát audio cho từ: " + word);
+    }
+</script>
