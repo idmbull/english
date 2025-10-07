@@ -1,0 +1,65 @@
+<!-- Spelling -->
+<script>
+    function normalizeSpaces(str) {
+        return str.replace(/\s+/g, " ").trim();
+    }
+
+    function setupTypingCheck() {
+        const correctWords = correctText.trim().toLowerCase().split(/\s+/);
+        const correctFullText = correctText.trim().toLowerCase(); // Toàn bộ câu chuẩn
+        const userInput = document.getElementById('typeans');
+        const resultDiv = document.getElementById('result');
+        let userPlayed = []; // ✅ nhớ từ đã phát rồi
+
+        userInput.removeEventListener('input', handleInput);
+        userInput.addEventListener('input', handleInput);
+
+        function handleInput() {
+            const mode = "word"; // "word" hoặc "char"
+            const inputWords = userInput.value.trim().toLowerCase().split(/\s+/);
+            const inputFullText = userInput.value.trim().toLowerCase();
+            let resultHTML = '';
+
+            for (let i = 0; i < correctWords.length; i++) {
+                const correct = correctWords[i] || '';
+                const user = inputWords[i] || '';
+
+                if (mode === 'word') {
+                    if (user === correct) {
+                        resultHTML += `<span class="correct space">${user}</span>`;
+                        // ✅ nếu đúng từ và chưa phát thì gọi playAudio
+                        if (!userPlayed[i]) {
+                            playWord(correct.replace(/[^a-z0-9']/gi, ""));
+                            userPlayed[i] = true;
+                        }
+                    } else {
+                        resultHTML += `<span class="incorrect space">${user || '...'}</span>`;
+                    }
+                } else if (mode === 'char') {
+                    const maxLen = Math.max(correct.length, user.length);
+                    let wordHTML = '';
+                    for (let j = 0; j < maxLen; j++) {
+                        const cChar = correct[j] || '';
+                        const uChar = user[j] || '';
+                        if (uChar === '') {
+                            wordHTML += `<span>_ </span>`;
+                        } else if (uChar === cChar) {
+                            wordHTML += `<span class="correct">${uChar}</span>`;
+                        } else {
+                            wordHTML += `<span class="incorrect">${uChar}</span>`;
+                        }
+                    }
+                    resultHTML += `<span class="space">${wordHTML}</span>`;
+                }
+            }
+
+            resultDiv.innerHTML = resultHTML;
+
+            // Lật thẻ nếu gõ đúng 100%
+            if (normalizeSpaces(inputFullText) === normalizeSpaces(correctFullText)) {
+                pycmd("ans");
+            }
+        }
+    }
+    setupTypingCheck();
+</script>
